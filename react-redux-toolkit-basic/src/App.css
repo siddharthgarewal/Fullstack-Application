@@ -1,0 +1,127 @@
+#root {
+  margin: 0 auto;
+}
+
+.container {
+  max-width: 860px;
+  margin: 2rem auto;
+  padding: 0 1rem 2rem;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.subtitle {
+  margin-top: 0.5rem;
+  color: #4b5563;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 1rem;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+}
+
+.value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.button-row,
+.amount-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+}
+
+input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  width: 120px;
+}
+
+.status-line {
+  margin-top: 0.75rem;
+  color: #374151;
+}
+
+.error {
+  color: #b91c1c;
+  margin: 0.25rem 0;
+}
+
+.list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.post-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.post-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.crud-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.post-input {
+  width: 280px;
+  max-width: 100%;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.notes ol {
+  margin: 0;
+  padding-left: 1.2rem;
+}
