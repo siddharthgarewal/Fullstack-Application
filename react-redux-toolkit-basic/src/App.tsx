@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
   fetchCurrentUser,
@@ -13,12 +14,30 @@ import {
   reset,
 } from "./features/counter/counterSlice";
 import {
-  createPost,
-  deletePost,
-  fetchPosts,
-  updatePost,
-} from "./features/posts/postsSlice";
+  postsApi,
+  useCreatePostMutation,
+  useDeletePostMutation,
+  useGetPostsQuery,
+  useUpdatePostMutation,
+} from "./features/posts/postsApi";
 import "./App.css";
+
+function getApiErrorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return "Something went wrong";
+  }
+
+  const fetchError = error as FetchBaseQueryError;
+
+  if ("data" in fetchError) {
+    const data = fetchError.data as { message?: string };
+    if (data && typeof data.message === "string") {
+      return data.message;
+    }
+  }
+
+  return "Something went wrong";
+}
 
 function App() {
   const [amount, setAmount] = useState(5);
@@ -33,19 +52,41 @@ function App() {
   const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth);
   const counter = useAppSelector((state) => state.counter.value);
-  const { items, status, error } = useAppSelector((state) => state.posts);
+
+  const {
+    data: items = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useGetPostsQuery(undefined, { skip: !auth.token });
+  const [createPost, { isLoading: isCreatingPost }] = useCreatePostMutation();
+  const [updatePost, { isLoading: isUpdatingPost }] = useUpdatePostMutation();
+  const [deletePost, { isLoading: isDeletingPost }] = useDeletePostMutation();
+
+  const postsLoading =
+    isLoading ||
+    isFetching ||
+    isCreatingPost ||
+    isUpdatingPost ||
+    isDeletingPost;
+
+  const postsStatus = !auth.token
+    ? "unauthenticated"
+    : postsLoading
+      ? "loading"
+      : isError
+        ? "failed"
+        : "succeeded";
+
+  const postsError = isError ? getApiErrorMessage(error) : null;
 
   useEffect(() => {
     if (auth.token && !auth.user) {
       dispatch(fetchCurrentUser());
     }
   }, [auth.token, auth.user, dispatch]);
-
-  useEffect(() => {
-    if (auth.token) {
-      dispatch(fetchPosts());
-    }
-  }, [auth.token, dispatch]);
 
   const handleAuthSubmit = () => {
     if (!email.trim() || !password.trim()) {
@@ -77,17 +118,22 @@ function App() {
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(postsApi.util.resetApiState());
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     const trimmedTitle = newPostTitle.trim();
 
     if (!trimmedTitle) {
       return;
     }
 
-    dispatch(createPost(trimmedTitle));
-    setNewPostTitle("");
+    try {
+      await createPost(trimmedTitle).unwrap();
+      setNewPostTitle("");
+    } catch {
+      // Keep input so user can retry if request fails.
+    }
   };
 
   const handleStartEditing = (id: number, title: string) => {
@@ -100,13 +146,20 @@ function App() {
     setEditingTitle("");
   };
 
-  const handleSaveEditing = () => {
+  const handleSaveEditing = async () => {
     if (editingPostId === null || !editingTitle.trim()) {
       return;
     }
 
-    dispatch(updatePost({ id: editingPostId, title: editingTitle.trim() }));
-    handleCancelEditing();
+    try {
+      await updatePost({
+        id: editingPostId,
+        title: editingTitle.trim(),
+      }).unwrap();
+      handleCancelEditing();
+    } catch {
+      // Keep edit mode open so user can retry.
+    }
   };
 
   return (
@@ -205,12 +258,12 @@ function App() {
       </section>
 
       <section className="panel">
-        <h2>2) Async Thunk + CRUD API Integration</h2>
+        <h2>2) RTK Query + CRUD API Integration</h2>
         <button
-          onClick={() => dispatch(fetchPosts())}
-          disabled={status === "loading" || !auth.token}
+          onClick={() => refetch()}
+          disabled={postsLoading || !auth.token}
         >
-          {status === "loading" ? "Loading..." : "Fetch Posts"}
+          {postsLoading ? "Loading..." : "Fetch Posts"}
         </button>
 
         <div className="crud-row">
@@ -223,9 +276,7 @@ function App() {
           />
           <button
             onClick={handleCreatePost}
-            disabled={
-              status === "loading" || !newPostTitle.trim() || !auth.token
-            }
+            disabled={postsLoading || !newPostTitle.trim() || !auth.token}
           >
             Add Post
           </button>
@@ -235,8 +286,8 @@ function App() {
           <p className="status-line">Login required to access posts APIs.</p>
         )}
 
-        <p className="status-line">Status: {status}</p>
-        {error && <p className="error">Error: {error}</p>}
+        <p className="status-line">Status: {postsStatus}</p>
+        {postsError && <p className="error">Error: {postsError}</p>}
 
         <ul className="list post-list">
           {items.map((post) => (
@@ -252,7 +303,7 @@ function App() {
                   <div className="inline-actions">
                     <button
                       onClick={handleSaveEditing}
-                      disabled={status === "loading" || !editingTitle.trim()}
+                      disabled={postsLoading || !editingTitle.trim()}
                     >
                       Save
                     </button>
@@ -265,13 +316,13 @@ function App() {
                   <div className="inline-actions">
                     <button
                       onClick={() => handleStartEditing(post.id, post.title)}
-                      disabled={status === "loading" || !auth.token}
+                      disabled={postsLoading || !auth.token}
                     >
                       Edit
                     </button>
                     <button
-                      onClick={() => dispatch(deletePost(post.id))}
-                      disabled={status === "loading" || !auth.token}
+                      onClick={() => deletePost(post.id)}
+                      disabled={postsLoading || !auth.token}
                     >
                       Delete
                     </button>
