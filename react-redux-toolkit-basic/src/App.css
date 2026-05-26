@@ -104,6 +104,24 @@ input {
   border-bottom: 1px solid #e5e7eb;
 }
 
+.auth-panel {
+  border-left: 4px solid #2563eb;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  max-width: 420px;
+}
+
+.auth-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .crud-row {
   display: flex;
   gap: 0.75rem;

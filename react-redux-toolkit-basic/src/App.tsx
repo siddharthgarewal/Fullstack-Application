@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
+  fetchCurrentUser,
+  loginUser,
+  logout,
+  registerUser,
+} from "./features/auth/authSlice";
+import {
   decrement,
   increment,
   incrementByAmount,
@@ -16,17 +22,62 @@ import "./App.css";
 
 function App() {
   const [amount, setAmount] = useState(5);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [newPostTitle, setNewPostTitle] = useState("");
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
 
   const dispatch = useAppDispatch();
+  const auth = useAppSelector((state) => state.auth);
   const counter = useAppSelector((state) => state.counter.value);
   const { items, status, error } = useAppSelector((state) => state.posts);
 
   useEffect(() => {
-    dispatch(fetchPosts());
-  }, [dispatch]);
+    if (auth.token && !auth.user) {
+      dispatch(fetchCurrentUser());
+    }
+  }, [auth.token, auth.user, dispatch]);
+
+  useEffect(() => {
+    if (auth.token) {
+      dispatch(fetchPosts());
+    }
+  }, [auth.token, dispatch]);
+
+  const handleAuthSubmit = () => {
+    if (!email.trim() || !password.trim()) {
+      return;
+    }
+
+    if (authMode === "register") {
+      if (!name.trim()) {
+        return;
+      }
+
+      dispatch(
+        registerUser({
+          name: name.trim(),
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      );
+      return;
+    }
+
+    dispatch(
+      loginUser({
+        email: email.trim(),
+        password: password.trim(),
+      }),
+    );
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+  };
 
   const handleCreatePost = () => {
     const trimmedTitle = newPostTitle.trim();
@@ -66,6 +117,71 @@ function App() {
         flow.
       </p>
 
+      <section className="panel auth-panel">
+        <h2>0) Authentication Flow (JWT)</h2>
+
+        {auth.user ? (
+          <div className="auth-user-row">
+            <p className="status-line">
+              Logged in as <strong>{auth.user.name}</strong> ({auth.user.email})
+            </p>
+            <button onClick={handleLogout}>Logout</button>
+          </div>
+        ) : (
+          <>
+            <div className="button-row">
+              <button
+                onClick={() => setAuthMode("login")}
+                disabled={authMode === "login"}
+              >
+                Login
+              </button>
+              <button
+                onClick={() => setAuthMode("register")}
+                disabled={authMode === "register"}
+              >
+                Register
+              </button>
+            </div>
+
+            <div className="auth-form">
+              {authMode === "register" && (
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Name"
+                />
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password (min 6 chars)"
+              />
+              <button
+                onClick={handleAuthSubmit}
+                disabled={auth.status === "loading"}
+              >
+                {auth.status === "loading"
+                  ? "Please wait..."
+                  : authMode === "register"
+                    ? "Create Account"
+                    : "Login"}
+              </button>
+            </div>
+
+            {auth.error && <p className="error">Auth Error: {auth.error}</p>}
+          </>
+        )}
+      </section>
+
       <section className="panel">
         <h2>1) Counter Slice (Synchronous State)</h2>
         <p className="value">Current Count: {counter}</p>
@@ -92,7 +208,7 @@ function App() {
         <h2>2) Async Thunk + CRUD API Integration</h2>
         <button
           onClick={() => dispatch(fetchPosts())}
-          disabled={status === "loading"}
+          disabled={status === "loading" || !auth.token}
         >
           {status === "loading" ? "Loading..." : "Fetch Posts"}
         </button>
@@ -107,11 +223,17 @@ function App() {
           />
           <button
             onClick={handleCreatePost}
-            disabled={status === "loading" || !newPostTitle.trim()}
+            disabled={
+              status === "loading" || !newPostTitle.trim() || !auth.token
+            }
           >
             Add Post
           </button>
         </div>
+
+        {!auth.token && (
+          <p className="status-line">Login required to access posts APIs.</p>
+        )}
 
         <p className="status-line">Status: {status}</p>
         {error && <p className="error">Error: {error}</p>}
@@ -143,13 +265,13 @@ function App() {
                   <div className="inline-actions">
                     <button
                       onClick={() => handleStartEditing(post.id, post.title)}
-                      disabled={status === "loading"}
+                      disabled={status === "loading" || !auth.token}
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => dispatch(deletePost(post.id))}
-                      disabled={status === "loading"}
+                      disabled={status === "loading" || !auth.token}
                     >
                       Delete
                     </button>

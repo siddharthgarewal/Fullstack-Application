@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import authRouter from "./routes/authRoutes";
 import postRouter from "./routes/postRoutes";
+import { requireAuth } from "./middlewares/authMiddleware";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 
 const app = express();
@@ -17,7 +19,8 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("Express + TypeScript backend is running");
 });
 
-app.use("/api/posts", postRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/posts", requireAuth, postRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

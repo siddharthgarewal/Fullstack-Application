@@ -1,7 +1,9 @@
 {
-  "nextPostId": 3,
+  "nextPostId": 4,
   "posts": [
-    { "id": 1, "title": "Build Redux Toolkit project" },
-    { "id": 2, "title": "Connect frontend to backend APIs" }
+    {
+      "id": 2,
+      "title": "Connect frontend to backend APIs"
+    }
   ]
 }

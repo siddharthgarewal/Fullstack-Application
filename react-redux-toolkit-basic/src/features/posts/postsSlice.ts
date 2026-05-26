@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import type { RootState } from "../../app/store";
 
 export interface Post {
   id: number;
@@ -32,10 +33,25 @@ async function parseError(response: Response, fallbackMessage: string) {
   }
 }
 
+function getAuthHeaders(getState: () => RootState) {
+  const token = getState().auth.token;
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export const fetchPosts = createAsyncThunk(
   "posts/fetchPosts",
-  async (_, { rejectWithValue }) => {
-    const response = await fetch(API_BASE_URL);
+  async (_, { rejectWithValue, getState }) => {
+    const response = await fetch(API_BASE_URL, {
+      headers: {
+        ...getAuthHeaders(getState as () => RootState),
+      },
+    });
 
     if (!response.ok) {
       return rejectWithValue(
@@ -49,11 +65,12 @@ export const fetchPosts = createAsyncThunk(
 
 export const createPost = createAsyncThunk(
   "posts/createPost",
-  async (title: string, { rejectWithValue }) => {
+  async (title: string, { rejectWithValue, getState }) => {
     const response = await fetch(API_BASE_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(getState as () => RootState),
       },
       body: JSON.stringify({ title }),
     });
@@ -70,11 +87,15 @@ export const createPost = createAsyncThunk(
 
 export const updatePost = createAsyncThunk(
   "posts/updatePost",
-  async (payload: { id: number; title: string }, { rejectWithValue }) => {
+  async (
+    payload: { id: number; title: string },
+    { rejectWithValue, getState },
+  ) => {
     const response = await fetch(`${API_BASE_URL}/${payload.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(getState as () => RootState),
       },
       body: JSON.stringify({ title: payload.title }),
     });
@@ -91,9 +112,12 @@ export const updatePost = createAsyncThunk(
 
 export const deletePost = createAsyncThunk(
   "posts/deletePost",
-  async (id: number, { rejectWithValue }) => {
+  async (id: number, { rejectWithValue, getState }) => {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
       method: "DELETE",
+      headers: {
+        ...getAuthHeaders(getState as () => RootState),
+      },
     });
 
     if (!response.ok) {

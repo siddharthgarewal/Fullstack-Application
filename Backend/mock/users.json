@@ -1,0 +1,17 @@
+{
+  "nextUserId": 3,
+  "users": [
+    {
+      "id": 1,
+      "name": "test",
+      "email": "test@gmail.com",
+      "passwordHash": "$2b$10$Oq1QBKA8ZD2lpcqqjI1sLe5eHvqPQnfoX7cbIHGMaPWdCsRkU9rte"
+    },
+    {
+      "id": 2,
+      "name": "test",
+      "email": "tesgdiw",
+      "passwordHash": "$2b$10$irL5wbFNBhR7qGtHC/HNV.RD4mt2VBgCQpcpbr3N4QwOja85QgCvu"
+    }
+  ]
+}
