@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
@@ -21,6 +21,10 @@ import {
   useUpdatePostMutation,
 } from "./features/posts/postsApi";
 import "./App.css";
+
+const HeavyAnalyticsPanel = lazy(
+  () => import("./features/performance/HeavyAnalyticsPanel"),
+);
 
 function getApiErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") {
@@ -48,6 +52,7 @@ function App() {
   const [newPostTitle, setNewPostTitle] = useState("");
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth);
@@ -335,6 +340,25 @@ function App() {
       </section>
 
       <section className="panel notes">
+        <h2>3) Performance Toolkit Example</h2>
+        <p>
+          This section demonstrates lazy loading (code splitting), a
+          tree-shakeable utility module, and bundle analysis with Vite.
+        </p>
+        <button onClick={() => setShowAnalytics((prev) => !prev)}>
+          {showAnalytics ? "Unload" : "Load"} Lazy Analytics Panel
+        </button>
+
+        {showAnalytics && (
+          <Suspense
+            fallback={<p className="status-line">Loading analytics chunk...</p>}
+          >
+            <HeavyAnalyticsPanel />
+          </Suspense>
+        )}
+      </section>
+
+      <section className="panel notes">
         <h2>Interview Talking Points</h2>
         <ol>
           <li>
@@ -351,6 +375,18 @@ function App() {
           <li>
             Why typed RootState and AppDispatch improve DX and reliability in
             TS.
+          </li>
+          <li>
+            How lazy imports split JavaScript into route/feature chunks and
+            improve initial load.
+          </li>
+          <li>
+            How ES module named exports allow tree shaking to remove unused
+            code.
+          </li>
+          <li>
+            How to inspect bundle composition using{" "}
+            <code>npm run build:analyze</code>.
           </li>
         </ol>
       </section>

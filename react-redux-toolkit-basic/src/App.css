@@ -143,3 +143,19 @@ input {
   margin: 0;
   padding-left: 1.2rem;
 }
+
+.analysis-box {
+  margin-top: 0.75rem;
+  border: 1px dashed #9ca3af;
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.analysis-box h3 {
+  margin: 0 0 0.4rem;
+}
+
+.analysis-box p {
+  margin: 0.4rem 0;
+}
