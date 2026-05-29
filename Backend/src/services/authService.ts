@@ -1,11 +1,21 @@
 import bcrypt from "bcryptjs";
 import { UserRepository } from "../repositories/userRepository.types";
 import { SafeUser, User } from "../types/user";
-import { signAuthToken } from "../utils/jwt";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt";
 
 export interface AuthResponse {
   user: SafeUser;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface AuthService {
@@ -15,6 +25,8 @@ export interface AuthService {
     password: string,
   ): Promise<AuthResponse>;
   login(email: string, password: string): Promise<AuthResponse | null>;
+  refresh(refreshToken: string): Promise<RefreshResponse | null>;
+  logout(refreshToken: string): Promise<void>;
   getSafeUserById(userId: number): Promise<SafeUser | null>;
 }
 
@@ -23,6 +35,13 @@ function toSafeUser(user: User): SafeUser {
     id: user.id,
     name: user.name,
     email: user.email,
+  };
+}
+
+function createTokenPair(user: SafeUser): RefreshResponse {
+  return {
+    accessToken: signAccessToken({ userId: user.id, email: user.email }),
+    refreshToken: signRefreshToken({ userId: user.id, email: user.email }),
   };
 }
 
@@ -48,11 +67,17 @@ export class DefaultAuthService implements AuthService {
     );
 
     const safeUser = toSafeUser(createdUser);
-    const token = signAuthToken({ userId: safeUser.id, email: safeUser.email });
+    const tokenPair = createTokenPair(safeUser);
+    const refreshTokenHash = await bcrypt.hash(tokenPair.refreshToken, 10);
+    await this.userRepository.updateRefreshTokenHash(
+      safeUser.id,
+      refreshTokenHash,
+    );
 
     return {
       user: safeUser,
-      token,
+      accessToken: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
     };
   }
 
@@ -70,12 +95,75 @@ export class DefaultAuthService implements AuthService {
     }
 
     const safeUser = toSafeUser(user);
-    const token = signAuthToken({ userId: safeUser.id, email: safeUser.email });
+    const tokenPair = createTokenPair(safeUser);
+    const refreshTokenHash = await bcrypt.hash(tokenPair.refreshToken, 10);
+    await this.userRepository.updateRefreshTokenHash(
+      safeUser.id,
+      refreshTokenHash,
+    );
 
     return {
       user: safeUser,
-      token,
+      accessToken: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
     };
+  }
+
+  async refresh(refreshToken: string): Promise<RefreshResponse | null> {
+    try {
+      const payload = verifyRefreshToken(refreshToken);
+      const user = await this.userRepository.findById(payload.userId);
+
+      if (!user || !user.refreshTokenHash) {
+        return null;
+      }
+
+      const isRefreshTokenValid = await bcrypt.compare(
+        refreshToken,
+        user.refreshTokenHash,
+      );
+
+      if (!isRefreshTokenValid) {
+        return null;
+      }
+
+      const safeUser = toSafeUser(user);
+      const tokenPair = createTokenPair(safeUser);
+      const nextRefreshHash = await bcrypt.hash(tokenPair.refreshToken, 10);
+
+      await this.userRepository.updateRefreshTokenHash(
+        user.id,
+        nextRefreshHash,
+      );
+
+      return tokenPair;
+    } catch {
+      return null;
+    }
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    try {
+      const payload = verifyRefreshToken(refreshToken);
+      const user = await this.userRepository.findById(payload.userId);
+
+      if (!user || !user.refreshTokenHash) {
+        return;
+      }
+
+      const isRefreshTokenValid = await bcrypt.compare(
+        refreshToken,
+        user.refreshTokenHash,
+      );
+
+      if (!isRefreshTokenValid) {
+        return;
+      }
+
+      await this.userRepository.updateRefreshTokenHash(user.id, null);
+    } catch {
+      // Ignore invalid tokens during logout to keep endpoint idempotent.
+    }
   }
 
   async getSafeUserById(userId: number): Promise<SafeUser | null> {

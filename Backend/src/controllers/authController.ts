@@ -6,6 +6,7 @@ interface AuthPayload {
   name?: unknown;
   email?: unknown;
   password?: unknown;
+  refreshToken?: unknown;
 }
 
 function normalizeEmail(email: unknown): string | null {
@@ -32,6 +33,15 @@ function normalizeName(name: unknown): string | null {
   }
 
   const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeRefreshToken(refreshToken: unknown): string | null {
+  if (typeof refreshToken !== "string") {
+    return null;
+  }
+
+  const trimmed = refreshToken.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
 
@@ -83,6 +93,38 @@ export async function loginHandler(req: Request, res: Response) {
   }
 
   res.status(200).json(response);
+}
+
+export async function refreshTokenHandler(req: Request, res: Response) {
+  const payload = req.body as AuthPayload;
+  const refreshToken = normalizeRefreshToken(payload.refreshToken);
+
+  if (!refreshToken) {
+    res.status(400).json({ message: "Refresh token is required" });
+    return;
+  }
+
+  const response = await authService.refresh(refreshToken);
+
+  if (!response) {
+    res.status(401).json({ message: "Invalid or expired refresh token" });
+    return;
+  }
+
+  res.status(200).json(response);
+}
+
+export async function logoutHandler(req: Request, res: Response) {
+  const payload = req.body as AuthPayload;
+  const refreshToken = normalizeRefreshToken(payload.refreshToken);
+
+  if (!refreshToken) {
+    res.status(400).json({ message: "Refresh token is required" });
+    return;
+  }
+
+  await authService.logout(refreshToken);
+  res.status(200).json({ message: "Logged out" });
 }
 
 export async function getCurrentUserHandler(req: Request, res: Response) {

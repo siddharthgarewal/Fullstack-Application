@@ -1,7 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../app/store";
 
-const TOKEN_STORAGE_KEY = "auth_token";
+const ACCESS_TOKEN_STORAGE_KEY = "auth_access_token";
+const REFRESH_TOKEN_STORAGE_KEY = "auth_refresh_token";
 
 export interface AuthUser {
   id: number;
@@ -11,7 +12,13 @@ export interface AuthUser {
 
 interface AuthResponse {
   user: AuthUser;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
 }
 
 interface MeResponse {
@@ -30,6 +37,7 @@ interface RegisterPayload extends AuthPayload {
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
 }
@@ -38,7 +46,8 @@ const API_BASE_URL = "http://localhost:3000/api/auth";
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem(TOKEN_STORAGE_KEY),
+  token: localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY),
+  refreshToken: localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY),
   status: "idle",
   error: null,
 };
@@ -52,13 +61,15 @@ async function parseError(response: Response, fallbackMessage: string) {
   }
 }
 
-function saveToken(token: string | null) {
-  if (!token) {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+function saveTokens(accessToken: string | null, refreshToken: string | null) {
+  if (!accessToken || !refreshToken) {
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
     return;
   }
 
-  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
 }
 
 export const registerUser = createAsyncThunk<
@@ -101,22 +112,90 @@ export const loginUser = createAsyncThunk<
   return (await response.json()) as AuthResponse;
 });
 
+export const refreshAuthToken = createAsyncThunk<
+  RefreshResponse,
+  void,
+  { state: RootState; rejectValue: string }
+>("auth/refreshAuthToken", async (_, { getState, rejectWithValue }) => {
+  const refreshToken = getState().auth.refreshToken;
+
+  if (!refreshToken) {
+    return rejectWithValue("No refresh token found");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!response.ok) {
+    return rejectWithValue(
+      await parseError(response, "Failed to refresh auth token"),
+    );
+  }
+
+  return (await response.json()) as RefreshResponse;
+});
+
+export const logoutUser = createAsyncThunk<void, void, { state: RootState }>(
+  "auth/logoutUser",
+  async (_, { getState }) => {
+    const refreshToken = getState().auth.refreshToken;
+
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      await fetch(`${API_BASE_URL}/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      // Ignore logout network failures and clear client session anyway.
+    }
+  },
+);
+
 export const fetchCurrentUser = createAsyncThunk<
   AuthUser,
   void,
   { state: RootState; rejectValue: string }
->("auth/fetchCurrentUser", async (_, { getState, rejectWithValue }) => {
+>("auth/fetchCurrentUser", async (_, thunkApi) => {
+  const { getState, dispatch, rejectWithValue } = thunkApi;
   const token = getState().auth.token;
 
   if (!token) {
     return rejectWithValue("No auth token found");
   }
 
-  const response = await fetch(`${API_BASE_URL}/me`, {
+  let response = await fetch(`${API_BASE_URL}/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  if (response.status === 401) {
+    const refreshResult = await dispatch(refreshAuthToken());
+
+    if (refreshAuthToken.rejected.match(refreshResult)) {
+      return rejectWithValue("Invalid or expired token");
+    }
+
+    const nextAccessToken = refreshResult.payload.accessToken;
+
+    response = await fetch(`${API_BASE_URL}/me`, {
+      headers: {
+        Authorization: `Bearer ${nextAccessToken}`,
+      },
+    });
+  }
 
   if (!response.ok) {
     return rejectWithValue(
@@ -132,12 +211,18 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    setTokens: (state, action: { payload: RefreshResponse }) => {
+      state.token = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      saveTokens(action.payload.accessToken, action.payload.refreshToken);
+    },
     logout: (state) => {
       state.user = null;
       state.token = null;
+      state.refreshToken = null;
       state.error = null;
       state.status = "idle";
-      saveToken(null);
+      saveTokens(null, null);
     },
   },
   extraReducers: (builder) => {
@@ -149,8 +234,9 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.status = "succeeded";
         state.user = action.payload.user;
-        state.token = action.payload.token;
-        saveToken(action.payload.token);
+        state.token = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        saveTokens(action.payload.accessToken, action.payload.refreshToken);
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.status = "failed";
@@ -164,8 +250,9 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.status = "succeeded";
         state.user = action.payload.user;
-        state.token = action.payload.token;
-        saveToken(action.payload.token);
+        state.token = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        saveTokens(action.payload.accessToken, action.payload.refreshToken);
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.status = "failed";
@@ -187,11 +274,32 @@ const authSlice = createSlice({
         if (action.payload === "Invalid or expired token") {
           state.user = null;
           state.token = null;
-          saveToken(null);
+          state.refreshToken = null;
+          saveTokens(null, null);
         }
+      })
+      .addCase(refreshAuthToken.fulfilled, (state, action) => {
+        state.token = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        saveTokens(action.payload.accessToken, action.payload.refreshToken);
+      })
+      .addCase(refreshAuthToken.rejected, (state) => {
+        state.user = null;
+        state.token = null;
+        state.refreshToken = null;
+        state.status = "idle";
+        saveTokens(null, null);
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.token = null;
+        state.refreshToken = null;
+        state.error = null;
+        state.status = "idle";
+        saveTokens(null, null);
       });
   },
 });
 
-export const { logout } = authSlice.actions;
+export const { logout, setTokens } = authSlice.actions;
 export default authSlice.reducer;

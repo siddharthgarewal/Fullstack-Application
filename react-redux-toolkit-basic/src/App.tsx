@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import { SubmitHandler, useForm } from "react-hook-form";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
   fetchCurrentUser,
   loginUser,
-  logout,
+  logoutUser,
   registerUser,
 } from "./features/auth/authSlice";
 import {
@@ -25,6 +26,14 @@ import "./App.css";
 const HeavyAnalyticsPanel = lazy(
   () => import("./features/performance/HeavyAnalyticsPanel"),
 );
+
+type JobPreferenceFormValues = {
+  fullName: string;
+  email: string;
+  yearsOfExperience: number;
+  preferredRole: "frontend" | "backend" | "fullstack";
+  subscribeToAlerts: boolean;
+};
 
 function getApiErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") {
@@ -53,6 +62,8 @@ function App() {
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [submittedPreference, setSubmittedPreference] =
+    useState<JobPreferenceFormValues | null>(null);
 
   const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth);
@@ -86,6 +97,21 @@ function App() {
         : "succeeded";
 
   const postsError = isError ? getApiErrorMessage(error) : null;
+
+  const {
+    register,
+    handleSubmit,
+    reset: resetForm,
+    formState: { errors, isSubmitting },
+  } = useForm<JobPreferenceFormValues>({
+    defaultValues: {
+      fullName: "",
+      email: "",
+      yearsOfExperience: 1,
+      preferredRole: "frontend",
+      subscribeToAlerts: false,
+    },
+  });
 
   useEffect(() => {
     if (auth.token && !auth.user) {
@@ -122,7 +148,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    dispatch(logout());
+    dispatch(logoutUser());
     dispatch(postsApi.util.resetApiState());
   };
 
@@ -165,6 +191,19 @@ function App() {
     } catch {
       // Keep edit mode open so user can retry.
     }
+  };
+
+  const onSubmitJobPreference: SubmitHandler<JobPreferenceFormValues> = async (
+    formValues,
+  ) => {
+    setSubmittedPreference(formValues);
+    resetForm({
+      fullName: "",
+      email: "",
+      yearsOfExperience: 1,
+      preferredRole: "frontend",
+      subscribeToAlerts: false,
+    });
   };
 
   return (
@@ -355,6 +394,136 @@ function App() {
           >
             <HeavyAnalyticsPanel />
           </Suspense>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>4) React Hook Form Example</h2>
+        <p className="status-line">
+          This form uses <code>useForm</code>, built-in validation rules, and
+          typed submit handling.
+        </p>
+
+        <form
+          className="rhf-form"
+          onSubmit={handleSubmit(onSubmitJobPreference)}
+          noValidate
+        >
+          <div className="rhf-row">
+            <label htmlFor="fullName">Full Name</label>
+            <input
+              id="fullName"
+              type="text"
+              placeholder="Your full name"
+              {...register("fullName", {
+                required: "Name is required",
+                minLength: {
+                  value: 3,
+                  message: "Name should have at least 3 characters",
+                },
+              })}
+            />
+            {errors.fullName && (
+              <p className="error">{errors.fullName.message}</p>
+            )}
+          </div>
+
+          <div className="rhf-row">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              {...register("email", {
+                required: "Email is required",
+                pattern: {
+                  value: /^\S+@\S+\.\S+$/,
+                  message: "Please enter a valid email address",
+                },
+              })}
+            />
+            {errors.email && <p className="error">{errors.email.message}</p>}
+          </div>
+
+          <div className="rhf-row">
+            <label htmlFor="yearsOfExperience">Years of Experience</label>
+            <input
+              id="yearsOfExperience"
+              type="number"
+              min={0}
+              max={40}
+              {...register("yearsOfExperience", {
+                valueAsNumber: true,
+                required: "Experience is required",
+                min: {
+                  value: 0,
+                  message: "Experience cannot be negative",
+                },
+                max: {
+                  value: 40,
+                  message: "Please enter a realistic number",
+                },
+              })}
+            />
+            {errors.yearsOfExperience && (
+              <p className="error">{errors.yearsOfExperience.message}</p>
+            )}
+          </div>
+
+          <div className="rhf-row">
+            <label htmlFor="preferredRole">Preferred Role</label>
+            <select
+              id="preferredRole"
+              className="rhf-select"
+              {...register("preferredRole", {
+                required: "Please choose a role",
+              })}
+            >
+              <option value="frontend">Frontend</option>
+              <option value="backend">Backend</option>
+              <option value="fullstack">Fullstack</option>
+            </select>
+            {errors.preferredRole && (
+              <p className="error">{errors.preferredRole.message}</p>
+            )}
+          </div>
+
+          <label className="rhf-checkbox-row" htmlFor="subscribeToAlerts">
+            <input
+              id="subscribeToAlerts"
+              type="checkbox"
+              {...register("subscribeToAlerts")}
+            />
+            Send me new job alerts
+          </label>
+
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting..." : "Submit Preferences"}
+          </button>
+        </form>
+
+        {submittedPreference && (
+          <div className="analysis-box">
+            <h3>Submitted Data</h3>
+            <p>
+              <strong>Name:</strong> {submittedPreference.fullName}
+            </p>
+            <p>
+              <strong>Email:</strong> {submittedPreference.email}
+            </p>
+            <p>
+              <strong>Experience:</strong>{" "}
+              {submittedPreference.yearsOfExperience} years
+            </p>
+            <p>
+              <strong>Preferred role:</strong>{" "}
+              {submittedPreference.preferredRole}
+            </p>
+            <p>
+              <strong>Subscribed:</strong>{" "}
+              {submittedPreference.subscribeToAlerts ? "Yes" : "No"}
+            </p>
+          </div>
         )}
       </section>
 

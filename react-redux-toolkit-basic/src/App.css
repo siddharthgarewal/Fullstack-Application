@@ -50,7 +50,8 @@ h2 {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -158,4 +159,38 @@ input {
 
 .analysis-box p {
   margin: 0.4rem 0;
+}
+
+.rhf-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  max-width: 520px;
+}
+
+.rhf-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rhf-row label {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.rhf-select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.rhf-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #1f2937;
+}
+
+.rhf-checkbox-row input {
+  width: auto;
 }

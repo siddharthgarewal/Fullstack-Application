@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   passwordHash: string;
+  refreshTokenHash?: string | null;
 }
 
 export interface SafeUser {

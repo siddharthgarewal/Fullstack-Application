@@ -15,6 +15,7 @@ class MockUserRepository implements UserRepository {
       name,
       email,
       passwordHash,
+      refreshTokenHash: null,
     };
 
     db.users.push(newUser);
@@ -35,6 +36,23 @@ class MockUserRepository implements UserRepository {
   async findById(id: number): Promise<User | undefined> {
     const db = await readUserMockDb();
     return db.users.find((user) => user.id === id);
+  }
+
+  async updateRefreshTokenHash(
+    userId: number,
+    refreshTokenHash: string | null,
+  ): Promise<User | undefined> {
+    const db = await readUserMockDb();
+    const user = db.users.find((entry) => entry.id === userId);
+
+    if (!user) {
+      return undefined;
+    }
+
+    user.refreshTokenHash = refreshTokenHash;
+    await writeUserMockDb(db);
+
+    return user;
   }
 }
 

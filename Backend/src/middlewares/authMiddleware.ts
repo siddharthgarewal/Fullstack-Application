@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { verifyAuthToken } from "../utils/jwt";
+import { verifyAccessToken } from "../utils/jwt";
 
 export interface AuthenticatedRequest extends Request {
   auth?: {
@@ -19,7 +19,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.replace("Bearer ", "").trim();
 
   try {
-    const payload = verifyAuthToken(token);
+    const payload = verifyAccessToken(token);
     (req as AuthenticatedRequest).auth = {
       userId: payload.userId,
       email: payload.email,
